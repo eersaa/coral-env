@@ -48,7 +48,7 @@ EXAMPLES:
     # Run a bazel build command
     $(basename "$0") bazel build //tests/cocotb:all
 
-    # Run a bazel command with custom output root
+    # Run a bazel command with optional custom output root
     $(basename "$0") bazel --output_user_root=/tmp/build_output_coral_env run //tests/cocotb:core_mini_axi_sim_cocotb
 
     # Execute a binary
@@ -144,12 +144,30 @@ fi
 # Create build output directory if it doesn't exist
 mkdir -p "${BUILD_OUTPUT_DIR}"
 
+# Check if command is bazel and inject --output_user_root if not already present
+COMMAND=("$@")
+if [[ "$1" == "bazel" ]] || [[ "$1" == *"/bazel" ]]; then
+    # Check if --output_user_root is already specified
+    HAS_OUTPUT_ROOT=false
+    for arg in "$@"; do
+        if [[ "$arg" == --output_user_root=* ]] || [[ "$arg" == "--output_user_root" ]]; then
+            HAS_OUTPUT_ROOT=true
+            break
+        fi
+    done
+    
+    # If not specified, inject it after 'bazel' command
+    if [[ "$HAS_OUTPUT_ROOT" == false ]]; then
+        COMMAND=("$1" "--output_user_root=${BUILD_OUTPUT_DIR}" "${@:2}")
+    fi
+fi
+
 # Build and execute apptainer command
 info "Running command in container:"
 info "  Workspace: ${WORKSPACE_DIR} -> ${CONTAINER_WORKSPACE_PATH}"
 info "  Build output: ${BUILD_OUTPUT_DIR}"
 info "  Container: ${CONTAINER_NAME}"
-info "  Command: $*"
+info "  Command: ${COMMAND[*]}"
 echo
 
 exec apptainer exec \
@@ -158,4 +176,4 @@ exec apptainer exec \
     --pwd "${CONTAINER_WORKSPACE_PATH}" \
     --pid \
     "${CONTAINER_NAME}" \
-    "$@"
+    "${COMMAND[@]}"
