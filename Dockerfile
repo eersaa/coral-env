@@ -5,3 +5,5 @@ USER root
 RUN apt-get update && \
     apt-get install -y --no-install-recommends srecord ca-certificates && \
     rm -rf /var/lib/apt/lists/*
+
+USER ubuntu
