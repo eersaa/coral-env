@@ -1,0 +1,161 @@
+#!/bin/bash
+#
+# coral-env: Wrapper script for running commands in the Google Coral Apptainer container
+#
+# This script abstracts common apptainer parameters for easier usage.
+# It automatically handles bind mounts, working directories, and container pulling.
+
+set -e
+
+# Configuration
+DOCKER_IMAGE="your-dockerhub-username/coral-env:latest"
+CONTAINER_NAME="coral-env.sif"
+WORKSPACE_DIR="${CORAL_WORKSPACE_DIR:-$(pwd)}"
+BUILD_OUTPUT_DIR="/tmp/build_output_coral_env"
+CONTAINER_WORKSPACE_PATH="/src/workspace"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Function to print colored messages
+info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Function to show usage
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [OPTIONS] COMMAND [ARGS...]
+
+Wrapper script for running commands in the Google Coral Apptainer container.
+
+OPTIONS:
+    -h, --help              Show this help message
+    -p, --pull              Pull/update the container from Docker Hub before running
+    -w, --workspace DIR     Set workspace directory (default: current directory or \$CORAL_WORKSPACE_DIR)
+
+ENVIRONMENT VARIABLES:
+    CORAL_WORKSPACE_DIR     Default workspace directory
+
+EXAMPLES:
+    # Run a bazel build command
+    $(basename "$0") bazel build //tests/cocotb:all
+
+    # Run a bazel command with custom output root
+    $(basename "$0") bazel --output_user_root=/tmp/build_output_coral_env run //tests/cocotb:core_mini_axi_sim_cocotb
+
+    # Execute a binary
+    $(basename "$0") bazel-bin/tests/verilator_sim/core_mini_axi_sim --binary bazel-out/k8-fastbuild-ST-dd8dc713f32d/bin/examples/coralnpu_v2_hello_world_add_floats.elf --instr_trace
+
+    # Pull latest container and run
+    $(basename "$0") --pull bazel version
+
+    # Use custom workspace directory
+    $(basename "$0") -w /path/to/workspace bazel build :target
+
+    # Open interactive shell
+    $(basename "$0") /bin/bash
+
+EOF
+    exit 0
+}
+
+# Parse options
+PULL_CONTAINER=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            usage
+            ;;
+        -p|--pull)
+            PULL_CONTAINER=true
+            shift
+            ;;
+        -w|--workspace)
+            WORKSPACE_DIR="$2"
+            shift 2
+            ;;
+        -*)
+            error "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+        *)
+            # First non-option argument is the start of the command
+            break
+            ;;
+    esac
+done
+
+# Check if command was provided
+if [[ $# -eq 0 ]]; then
+    error "No command specified"
+    echo "Use --help for usage information"
+    exit 1
+fi
+
+# Resolve absolute path for container
+if [[ "${CONTAINER_NAME}" != /* ]]; then
+    CONTAINER_NAME="$(pwd)/${CONTAINER_NAME}"
+fi
+
+# Pull container if requested or if it doesn't exist
+if [[ "${PULL_CONTAINER}" == true ]] || [[ ! -f "${CONTAINER_NAME}" ]]; then
+    if [[ "${PULL_CONTAINER}" == true ]]; then
+        info "Pulling container from Docker Hub: ${DOCKER_IMAGE}"
+    else
+        info "Container not found at ${CONTAINER_NAME}"
+        info "Pulling from Docker Hub: ${DOCKER_IMAGE}"
+    fi
+    
+    # Create directory for container if needed
+    mkdir -p "$(dirname "${CONTAINER_NAME}")"
+    
+    # Pull the container
+    if ! apptainer pull --force "${CONTAINER_NAME}" "docker://${DOCKER_IMAGE}"; then
+        error "Failed to pull container from ${DOCKER_IMAGE}"
+        exit 1
+    fi
+    
+    info "Container pulled successfully"
+fi
+
+# Verify container exists
+if [[ ! -f "${CONTAINER_NAME}" ]]; then
+    error "Container file not found: ${CONTAINER_NAME}"
+    error "Use --pull to download it from Docker Hub"
+    exit 1
+fi
+
+# Verify workspace directory exists
+if [[ ! -d "${WORKSPACE_DIR}" ]]; then
+    error "Workspace directory not found: ${WORKSPACE_DIR}"
+    exit 1
+fi
+
+# Create build output directory if it doesn't exist
+mkdir -p "${BUILD_OUTPUT_DIR}"
+
+# Build and execute apptainer command
+info "Running command in container:"
+info "  Workspace: ${WORKSPACE_DIR} -> ${CONTAINER_WORKSPACE_PATH}"
+info "  Build output: ${BUILD_OUTPUT_DIR}"
+info "  Container: ${CONTAINER_NAME}"
+info "  Command: $*"
+echo
+
+exec apptainer exec \
+    --bind "${WORKSPACE_DIR}:${CONTAINER_WORKSPACE_PATH}" \
+    --bind "${BUILD_OUTPUT_DIR}:${BUILD_OUTPUT_DIR}" \
+    --pwd "${CONTAINER_WORKSPACE_PATH}" \
+    --pid \
+    "${CONTAINER_NAME}" \
+    "$@"

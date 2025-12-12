@@ -1,0 +1,11 @@
+# Apptainer SIF files
+*.sif
+
+# Build outputs
+build_output_coral_env/
+
+# Docker build cache
+.docker/
+
+# IDE
+.vscode/
