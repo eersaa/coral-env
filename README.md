@@ -27,13 +27,13 @@ export CORAL_WORKSPACE_DIR=/path/to/your/project
 ./coral-env bazel build :target
 ```
 
-4. **Pull the latest container:**
+4. **Pull the latest container and run command:**
 
 ```bash
 ./coral-env --pull bazel version
 ```
 
-5. **Open an interactive shell:**
+5. **Open an interactive shell inside container:**
 
 ```bash
 ./coral-env /bin/bash
@@ -51,7 +51,7 @@ The `coral-env` wrapper script simplifies running commands in the Apptainer cont
 ### Command Line Options
 
 - `-h, --help`: Show help message
-- `-p, --pull`: Pull/update the container from Docker Hub before running
+- `-p, --pull`: Pull/update the container from Docker Hub before running program inside container
 - `-w, --workspace DIR`: Set workspace directory (default: current directory or `$CORAL_WORKSPACE_DIR`)
 
 ### Environment Variables
@@ -82,7 +82,7 @@ The `coral-env` script automatically mounts:
 
 1. **Workspace directory** → `/src/workspace` (inside container)
    - Default: Current directory
-   - Override: Use `-w` flag or `CORAL_WORKSPACE_DIR` env var
+   - Override: Use `-w` flag or `CORAL_WORKSPACE_DIR` environment variable
 
 2. **Build output** → `/tmp/build_output_coral_env`
    - Persists build artifacts between container runs
@@ -91,18 +91,6 @@ The `coral-env` script automatically mounts:
 ## Publishing to Docker Hub
 
 The container is automatically built and published to Docker Hub when you push a tagged commit.
-
-### Setup
-
-1. **Configure Docker Hub credentials in GitHub:**
-   - Go to your repository's Settings → Secrets and variables → Actions
-   - Add two secrets:
-     - `DOCKERHUB_USERNAME`: Your Docker Hub username
-     - `DOCKERHUB_TOKEN`: Your Docker Hub access token ([create one here](https://hub.docker.com/settings/security))
-
-2. **Update the Docker image name:**
-   - Edit `coral-env` script and replace `your-dockerhub-username` with your actual Docker Hub username
-   - Edit `.github/workflows/docker-publish.yml` if you want to change the image name
 
 ### Creating a Release
 

@@ -33,7 +33,7 @@ usage() {
     cat << EOF
 Usage: $(basename "$0") [OPTIONS] COMMAND [ARGS...]
 
-Wrapper script for running commands in the Google Coral Apptainer container.
+Wrapper script for running commands in the Apptainer container building environment for Google Coral project.
 
 OPTIONS:
     -h, --help              Show this help message
